@@ -53,33 +53,52 @@ def create_individual(num_steps):
     return ind
 
 def crossover(parent1, parent2, num_steps):
-    # Uniform crossover
+    # Phase-Aware Crossover (Diffusion specific)
+    # The diffusion process has distinct phases (e.g., semantic formation vs detail refinement)
+    # We pick a random split point and swap entire phases rather than uniform random points.
+    split_point = random.randint(1, num_steps - 1)
+    
     child = []
     for i in range(num_steps):
-        p1_has = i in parent1
-        p2_has = i in parent2
-        
-        if random.random() > 0.5:
-            if p1_has: child.append(i)
+        if i < split_point:
+            if i in parent1: child.append(i)
         else:
-            if p2_has: child.append(i)
-    
+            if i in parent2: child.append(i)
+            
     # Ensure 0 is always evaluated
     if 0 not in child:
         child.insert(0, 0)
     return sorted(list(set(child)))
 
 def mutate(individual, num_steps, mutation_rate=0.1):
-    child = []
-    for i in range(num_steps):
-        has_val = i in individual
-        if random.random() < mutation_rate and i != 0:
-            has_val = not has_val
-        if has_val:
-            child.append(i)
+    # Block & Adaptive Mutation (Diffusion specific)
+    # We mutate contiguous blocks instead of single points, since feature maps 
+    # change smoothly over neighboring timesteps.
+    child = set(individual)
+    
+    if random.random() < 0.5:
+        # Standard point mutation
+        for i in range(1, num_steps):  # skip step 0
+            if random.random() < mutation_rate:
+                if i in child:
+                    child.remove(i)
+                else:
+                    child.add(i)
+    else:
+        # Block mutation (flip a block)
+        block_size = random.randint(2, 4)
+        start_idx = random.randint(1, max(1, num_steps - block_size))
+        for i in range(start_idx, start_idx + block_size):
+            # Slightly higher mutation rate inside the targeted block
+            if random.random() < mutation_rate * 2: 
+                if i in child:
+                    child.remove(i)
+                else:
+                    child.add(i)
+                    
     if 0 not in child:
-        child.insert(0, 0)
-    return sorted(list(set(child)))
+        child.add(0)
+    return sorted(list(child))
 
 def main():
     parser = argparse.ArgumentParser()

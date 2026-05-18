@@ -55,13 +55,17 @@ def main():
     # 1. Original Pipeline (Baseline for GA)
     print(f"\n{'='*40}\nRunning Original Pipeline (Baseline)...")
     set_random_seed(seed)
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
     start_time = time.time()
     pipeline_output_original = pipe(
         prompt, 
         num_inference_steps=args.steps,
         output_type='pt'
     ).images[0]
+    torch.cuda.synchronize()
     origin_time = time.time() - start_time
+    origin_mem = torch.cuda.max_memory_allocated() / (1024**2)
     save_image([pipeline_output_original], 'text2img_original.png')
 
     helper = DeepCacheSDHelper(pipe=pipe)
@@ -160,13 +164,17 @@ def main():
 
     print("Running Pipeline with Standard DeepCache...")
     set_random_seed(seed)
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
     start_time = time.time()
     deepcache_pipeline_output = pipe(
         prompt,
         num_inference_steps=args.steps,
         output_type='pt'
     ).images[0]
+    torch.cuda.synchronize()
     deepcache_time = time.time() - start_time
+    deepcache_mem = torch.cuda.max_memory_allocated() / (1024**2)
     save_image([deepcache_pipeline_output], 'text2img_deepcache_standard.png')
     helper.disable()
 
@@ -180,26 +188,30 @@ def main():
 
     print("Running Pipeline with GA-optimized DeepCache...")
     set_random_seed(seed)
+    torch.cuda.reset_peak_memory_stats()
+    torch.cuda.synchronize()
     start_time = time.time()
     ga_pipeline_output = pipe(
         prompt,
         num_inference_steps=args.steps,
         output_type='pt'
     ).images[0]
+    torch.cuda.synchronize()
     ga_time = time.time() - start_time
+    ga_mem = torch.cuda.max_memory_allocated() / (1024**2)
     save_image([ga_pipeline_output], 'text2img_deepcache_ga.png')
     helper.disable()
 
     print(f"\n{'='*40}")
-    print("Execution Time Comparison:")
+    print("Execution & Memory Comparison:")
     print(f"Prompt: '{prompt}'")
     print(f"Steps:  {args.steps}")
     print(f"GA Search Duration: {ga_search_time:.2f} seconds")
-    print("-" * 50)
-    print(f"Original Pipeline:               {origin_time:.2f} seconds")
-    print(f"Standard DeepCache (interval {args.cache_interval}):  {deepcache_time:.2f} seconds (Speedup: {origin_time/deepcache_time:.2f}x)")
-    print(f"GA DeepCache (sequence):         {ga_time:.2f} seconds (Speedup: {origin_time/ga_time:.2f}x)")
-    print("-" * 50)
+    print("-" * 65)
+    print(f"Original Pipeline:               {origin_time:.2f}s | Peak VRAM: {origin_mem:.1f} MB")
+    print(f"Standard DeepCache (interval {args.cache_interval}):  {deepcache_time:.2f}s (Speedup: {origin_time/deepcache_time:.2f}x) | Peak VRAM: {deepcache_mem:.1f} MB")
+    print(f"GA DeepCache (sequence):         {ga_time:.2f}s (Speedup: {origin_time/ga_time:.2f}x) | Peak VRAM: {ga_mem:.1f} MB")
+    print("-" * 65)
     print("Generated images have been saved to:")
     print("- text2img_original.png")
     print("- text2img_deepcache_standard.png")
